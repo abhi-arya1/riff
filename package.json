@@ -1,0 +1,33 @@
+{
+  "name": "riff",
+  "version": "0.1.0",
+  "description": "A local voice companion for Spotify and the car",
+  "license": "MIT",
+  "author": "Abhi Arya",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "packageManager": "bun@1.3.13",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "agent": "bun src/ask.ts",
+    "agent:trace": "bun src/ask.ts --trace",
+    "riff": "bun src/riff.ts",
+    "riff:trace": "bun src/riff.ts --trace",
+    "memory": "bun src/memory-server.ts",
+    "voice": "bun index.ts",
+    "start": "bun index.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.12.30",
+    "typebox": "^1.3.6"
+  }
+}

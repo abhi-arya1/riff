@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Riff</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <strong>RIFF</strong>
+        <div class="input-modes" role="group" aria-label="Microphone mode">
+          <button type="button" data-input-mode="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-input-mode="manual" aria-pressed="false">Manual</button>
+        </div>
+      </header>
+
+      <div class="playback-row">
+        <section class="playback" aria-live="polite">
+          <div class="playback-state" id="playback-state">CHECKING SPOTIFY</div>
+          <h1 id="track">—</h1>
+          <p id="artist">Open Spotify on this Mac</p>
+        </section>
+
+        <button class="play-toggle" id="play-toggle" type="button" aria-label="Pause Spotify" disabled>
+          <span class="pause-icon" aria-hidden="true"><i></i><i></i></span>
+          <span class="play-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <section class="voice" aria-live="polite">
+        <div class="voice-state">
+          <i id="dot"></i>
+          <span id="state">Ready</span>
+          <span id="activity"></span>
+        </div>
+        <div class="activity-log" id="activity-log" aria-label="Riff activity" hidden></div>
+        <div class="transcript" id="transcript">
+          <p>Tap start, then just talk.</p>
+        </div>
+      </section>
+
+      <button id="start" type="button">Start Riff</button>
+      <p class="hint" id="hint"></p>
+    </main>
+    <audio id="audio" autoplay></audio>
+    <script src="/app.js"></script>
+  </body>
+</html>
