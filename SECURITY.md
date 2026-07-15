@@ -16,7 +16,7 @@ contain only its public key, and `.data/tesla` is ignored by default. Remove the
 enrolled key from the vehicle and rotate it if the private key or laptop account
 is compromised.
 
-Spotify, OpenAI, Vercel, Twilio, and Tesla credentials should be scoped to the
+Spotify, OpenAI, Vercel, and Tesla credentials should be scoped to the
 smallest access the demo needs. Rotate any credential that appears in a commit,
 terminal recording, trace, screenshot, or uploaded demo artifact.
 

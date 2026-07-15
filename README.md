@@ -196,20 +196,6 @@ bun test
 bun run typecheck
 ```
 
-## Phone bridge
-
-The Bun server includes an optional Twilio media-stream endpoint. Set
-`PUBLIC_URL` to an HTTPS address that reaches the local server, then configure a
-Twilio voice webhook to POST to `/twilio/voice`. A temporary tunnel is suitable
-for a demo:
-
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-The browser path is the primary interface. The phone bridge is kept for
-experiments and requires separate Twilio setup.
-
 ## Project status
 
 The Spotify CLI dependency limits who can run the project today. Tesla support

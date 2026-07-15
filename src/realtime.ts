@@ -7,232 +7,30 @@ import { runPlayback, type PlaybackAction } from "./fast";
 import type { PiTrace } from "./pi";
 import { createRealtimeMemory } from "./realtime-memory";
 
-type Send = (message: string) => void;
 type Agent = ReturnType<typeof createMusicAgent>;
 type TeslaBle = ReturnType<typeof createTeslaBle>;
 type Memory = ReturnType<typeof createRealtimeMemory>;
 
-type TwilioEvent = {
-  event: string;
-  streamSid?: string;
-  start?: { streamSid: string };
-  media?: { payload: string };
-  mark?: { name: string };
-};
-
-type RealtimeEvent = {
-  type: string;
-  delta?: string;
-  call_id?: string;
-  name?: string;
-  arguments?: string;
-  item_id?: string;
-  response_id?: string;
-  response?: { id?: string; status?: string };
-};
-
-export function createBridge(sendTwilio: Send) {
-  let streamSid = "";
-  let ready = false;
-  const audio: string[] = [];
-  const agent = createMusicAgent();
-  const tesla = createTeslaBle();
-  const memory = createRealtimeMemory();
-  const generated = new Map<string, number>();
-  const heard = new Map<string, number>();
-  const marked = new Map<string, number>();
-  let responseId = "";
-  let itemId = "";
-  let turn = 0;
-
-  if (!config.openaiKey) {
-    console.error("OPENAI_API_KEY is missing");
-  }
-
-  const openai = new WebSocket(
-    `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(config.openaiModel)}`,
-    { headers: { Authorization: `Bearer ${config.openaiKey}` } },
-  );
-
-  openai.addEventListener("open", () => {
-    ready = true;
-    openai.send(JSON.stringify(realtimeSession()));
-    for (const chunk of audio.splice(0)) sendAudio(chunk);
-  });
-
-  openai.addEventListener("message", async (event) => {
-    const message = JSON.parse(String(event.data)) as RealtimeEvent;
-
-    if (message.type === "response.created") {
-      responseId = message.response?.id || "";
-    }
-
-    if (message.type === "response.done" && message.response?.id === responseId) {
-      responseId = "";
-    }
-
-    if (message.type === "response.output_audio.delta" && message.delta && streamSid) {
-      itemId = message.item_id || itemId;
-      sendTwilio(JSON.stringify({
-        event: "media",
-        streamSid,
-        media: { payload: message.delta },
-      }));
-      markAudio(itemId, message.delta);
-    }
-
-    if (message.type === "input_audio_buffer.speech_started" && streamSid) {
-      interrupt();
-    }
-
-    if (message.type === "response.function_call_arguments.done") {
-      await runCall(message);
-    }
-
-    if (message.type === "error") console.error("OpenAI Realtime error", message);
-  });
-
-  openai.addEventListener("error", (error) => {
-    console.error("OpenAI socket error", error);
-  });
-
-  function sendAudio(payload: string) {
-    openai.send(JSON.stringify({ type: "input_audio_buffer.append", audio: payload }));
-  }
-
-  function markAudio(id: string, payload: string) {
-    if (!id) return;
-    const duration = (generated.get(id) || 0) + Buffer.from(payload, "base64").byteLength / 8;
-    generated.set(id, duration);
-    if (duration - (marked.get(id) || 0) < 200) return;
-    marked.set(id, duration);
-    sendTwilio(JSON.stringify({
-      event: "mark",
-      streamSid,
-      mark: { name: `riff:${id}:${Math.floor(duration)}` },
-    }));
-  }
-
-  function interrupt() {
-    turn++;
-    agent.interrupt();
-    tesla.interrupt();
-    memory.interrupt();
-    sendTwilio(JSON.stringify({ event: "clear", streamSid }));
-
-    if (responseId) {
-      openai.send(JSON.stringify({ type: "response.cancel", response_id: responseId }));
-      responseId = "";
-    }
-
-    if (itemId) {
-      openai.send(JSON.stringify({
-        type: "conversation.item.truncate",
-        item_id: itemId,
-        content_index: 0,
-        audio_end_ms: Math.floor(heard.get(itemId) || 0),
-      }));
-      itemId = "";
-    }
-  }
-
-  async function runCall(message: RealtimeEvent) {
-    if (!message.name || !message.call_id) return;
-
-    let args = {};
-    try {
-      args = JSON.parse(message.arguments || "{}");
-    } catch {
-      args = {};
-    }
-
-    const callTurn = turn;
-    const result = await runRealtimeTool(message.name, args, agent, tesla, memory);
-    if (callTurn !== turn) return;
-    openai.send(JSON.stringify({
-      type: "conversation.item.create",
-      item: {
-        type: "function_call_output",
-        call_id: message.call_id,
-        output: JSON.stringify(result),
-      },
-    }));
-    openai.send(JSON.stringify({ type: "response.create" }));
-  }
-
-  return {
-    fromTwilio(raw: string) {
-      const message = JSON.parse(raw) as TwilioEvent;
-
-      if (message.event === "start") {
-        streamSid = message.start?.streamSid || message.streamSid || "";
-      }
-
-      if (message.event === "media" && message.media?.payload) {
-        if (ready) sendAudio(message.media.payload);
-        else audio.push(message.media.payload);
-      }
-
-      if (message.event === "mark" && message.mark?.name) {
-        const match = message.mark.name.match(/^riff:([^:]+):(\d+)$/);
-        if (match?.[1] && match[2]) heard.set(match[1], Number(match[2]));
-      }
-
-      if (message.event === "stop") {
-        agent.interrupt();
-        tesla.interrupt();
-        memory.interrupt();
-        openai.close();
-      }
-    },
-    close() {
-      agent.interrupt();
-      tesla.interrupt();
-      memory.interrupt();
-      openai.close();
-    },
-  };
-}
-
-type RealtimeMode = "phone" | "web";
-
-export function realtimeSession(mode: RealtimeMode = "phone") {
-  return {
-    type: "session.update",
-    session: realtimeConfig(mode),
-  };
-}
-
-export function realtimeConfig(mode: RealtimeMode = "phone") {
-  const web = mode === "web";
-  const format = { type: "audio/pcmu" };
+export function realtimeConfig() {
   return {
     type: "realtime",
-    ...(web ? { model: config.openaiModel } : {}),
+    model: config.openaiModel,
     output_modalities: ["audio"],
     instructions: realtimeInstructions(),
     audio: {
       input: {
-        ...(!web ? { format } : {}),
-        ...(web ? {
-          noise_reduction: { type: "far_field" },
-          transcription: { model: "gpt-4o-mini-transcribe" },
-        } : {}),
-        turn_detection: web ? {
+        noise_reduction: { type: "far_field" },
+        transcription: { model: "gpt-4o-mini-transcribe" },
+        turn_detection: {
           type: "server_vad",
           threshold: 0.65,
           prefix_padding_ms: 300,
           silence_duration_ms: 500,
           create_response: true,
           interrupt_response: true,
-        } : {
-          type: "semantic_vad",
-          create_response: true,
-          interrupt_response: false,
         },
       },
       output: {
-        ...(!web ? { format } : {}),
         voice: config.openaiVoice,
       },
     },

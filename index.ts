@@ -1,15 +1,13 @@
 import { Hono } from "hono";
-import { upgradeWebSocket, websocket } from "hono/bun";
 import { join } from "node:path";
 import { config } from "./src/config";
 import { createMusicAgent } from "./src/pi";
 import { createTeslaBle } from "./src/tesla-ble";
 import { createRealtimeMemory } from "./src/realtime-memory";
 import { ensureMemory } from "./src/memory";
-import { createBridge, realtimeConfig, runRealtimeTool } from "./src/realtime";
+import { realtimeConfig, runRealtimeTool } from "./src/realtime";
 import { runSpotify } from "./src/spotify";
 import { createTracePrinter } from "./src/trace";
-import { twiml } from "./src/twilio";
 import { activityStep } from "./src/activity";
 
 const app = new Hono();
@@ -49,7 +47,7 @@ app.post("/api/realtime/session", async (c) => {
 
   const form = new FormData();
   form.set("sdp", await c.req.text());
-  form.set("session", JSON.stringify(realtimeConfig("web")));
+  form.set("session", JSON.stringify(realtimeConfig()));
   const response = await fetch("https://api.openai.com/v1/realtime/calls", {
     method: "POST",
     headers: { Authorization: `Bearer ${config.openaiKey}` },
@@ -103,39 +101,9 @@ app.post("/api/end", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/twilio/voice", (c) => {
-  const host = config.publicUrl || new URL(c.req.url).origin;
-  const socketUrl = host.replace(/^http/, "ws") + "/twilio/media";
-  return c.body(twiml(socketUrl), 200, { "content-type": "text/xml" });
-});
-
-app.get(
-  "/twilio/media",
-  upgradeWebSocket(() => {
-    let bridge: ReturnType<typeof createBridge> | undefined;
-
-    return {
-      onOpen(_, ws) {
-        bridge = createBridge((message) => ws.send(message));
-      },
-      onMessage(event) {
-        bridge?.fromTwilio(String(event.data));
-      },
-      onClose() {
-        bridge?.close();
-      },
-      onError(error) {
-        console.error("Twilio socket error", error);
-        bridge?.close();
-      },
-    };
-  }),
-);
-
 const server = Bun.serve({
   port: config.port,
   fetch: app.fetch,
-  websocket,
   development: config.env !== "production",
 });
 

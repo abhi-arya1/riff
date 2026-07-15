@@ -1,14 +1,5 @@
 import { expect, test } from "bun:test";
-import { realtimeInstructions, realtimeSession, runRealtimeTool } from "./realtime";
-
-test("keeps Realtime generation under explicit interruption control", () => {
-  const update = realtimeSession() as any;
-  expect(update.session.audio.input.turn_detection).toEqual({
-    type: "semantic_vad",
-    create_response: true,
-    interrupt_response: false,
-  });
-});
+import { realtimeInstructions, realtimeConfig, runRealtimeTool } from "./realtime";
 
 test("shares Riff's personality with the voice layer", () => {
   expect(realtimeInstructions()).toContain("deep pull");
@@ -32,14 +23,14 @@ test("uses a compact humanlike spoken prompt structure", () => {
 });
 
 test("gives Realtime a dedicated low-latency playback tool", () => {
-  const update = realtimeSession("web") as any;
-  expect(update.session.tools[0].name).toBe("spotify_playback");
-  expect(update.session.tools[0].parameters.properties.action.enum).toContain("now_playing");
+  const update = realtimeConfig() as any;
+  expect(update.tools[0].name).toBe("spotify_playback");
+  expect(update.tools[0].parameters.properties.action.enum).toContain("now_playing");
 });
 
 test("gives dynamic music work to one adaptive agent", () => {
-  const update = realtimeSession("web") as any;
-  expect(update.session.tools.map((tool: { name: string }) => tool.name)).toEqual([
+  const update = realtimeConfig() as any;
+  expect(update.tools.map((tool: { name: string }) => tool.name)).toEqual([
     "spotify_playback",
     "personal_memory",
     "car_media",
@@ -67,8 +58,8 @@ test("recalls memory lazily and saves only durable explicit context", () => {
 });
 
 test("exposes only narrow BLE comfort controls to Realtime", () => {
-  const update = realtimeSession("web") as any;
-  const tool = update.session.tools.find((item: { name: string }) => item.name === "car_comfort");
+  const update = realtimeConfig() as any;
+  const tool = update.tools.find((item: { name: string }) => item.name === "car_comfort");
   expect(tool.parameters.properties.action.enum).toEqual([
     "climate_on",
     "climate_off",
@@ -80,8 +71,8 @@ test("exposes only narrow BLE comfort controls to Realtime", () => {
 });
 
 test("routes car volume directly to Tesla instead of Spotify", async () => {
-  const update = realtimeSession("web") as any;
-  const tool = update.session.tools.find((item: { name: string }) => item.name === "car_media");
+  const update = realtimeConfig() as any;
+  const tool = update.tools.find((item: { name: string }) => item.name === "car_media");
   expect(tool.parameters.properties.action.enum).toContain("volume_up");
   expect(realtimeInstructions()).toContain("an unqualified 'turn it up'");
   expect(realtimeInstructions()).toContain("Never claim Tesla volume is unavailable");
@@ -100,13 +91,13 @@ test("routes car volume directly to Tesla instead of Spotify", async () => {
 
 
 test("lets WebRTC own browser audio and native interruption", () => {
-  const update = realtimeSession("web") as any;
-  expect(update.session.model).toBeTruthy();
-  expect(update.session.audio.input.format).toBeUndefined();
-  expect(update.session.audio.output.format).toBeUndefined();
-  expect(update.session.audio.input.turn_detection.interrupt_response).toBe(true);
-  expect(update.session.audio.input.turn_detection.threshold).toBe(0.65);
-  expect(update.session.audio.input.turn_detection.eagerness).toBeUndefined();
+  const update = realtimeConfig() as any;
+  expect(update.model).toBeTruthy();
+  expect(update.audio.input.format).toBeUndefined();
+  expect(update.audio.output.format).toBeUndefined();
+  expect(update.audio.input.turn_detection.interrupt_response).toBe(true);
+  expect(update.audio.input.turn_detection.threshold).toBe(0.65);
+  expect(update.audio.input.turn_detection.eagerness).toBeUndefined();
 });
 
 test("keeps recommendation constraints across corrections", () => {
